@@ -3,11 +3,13 @@ import {
   AlignmentType,
   BorderStyle,
   Document,
+  HeightRule,
   ImageRun,
   Packer,
   Paragraph,
   Table,
   TableCell,
+  TableLayoutType,
   TableRow,
   TextRun,
   WidthType,
@@ -38,19 +40,27 @@ const ENGLISH_SLOGAN =
 const ENGLISH_TRANSFORM =
   'Digital Health Transformation for Integrated Smart Services'
 
-const NO_BORDER = {
-  top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-  bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-  left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-  right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+const BORDER = {
+  top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+  bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+  left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+  right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
 }
 
-const BORDER = {
-  top: { style: BorderStyle.SINGLE, size: 8, color: '000000' },
-  bottom: { style: BorderStyle.SINGLE, size: 8, color: '000000' },
-  left: { style: BorderStyle.SINGLE, size: 8, color: '000000' },
-  right: { style: BorderStyle.SINGLE, size: 8, color: '000000' },
-}
+/**
+ * Match Minutes of Meeting.docx 5-column grid (DXA).
+ * Spans: label=2, value=3, name=4, designation=1, num=1, decision=4, full=5
+ */
+const COLS = [522, 1867, 1829, 412, 5240] as const
+const TABLE_W = COLS.reduce((a, b) => a + b, 0)
+const W_LABEL = COLS[0] + COLS[1] // 2389
+const W_VALUE = COLS[2] + COLS[3] + COLS[4] // 7481
+const W_NAME = COLS[0] + COLS[1] + COLS[2] + COLS[3] // 4630
+const W_DESIG = COLS[4] // 5240
+const W_NUM = COLS[0] // 522
+const W_DECISION = COLS[1] + COLS[2] + COLS[3] + COLS[4] // 9348
+const ROW_H = 440
+const DISCUSSION_H = 1800
 
 async function loadBrandBytes(path: string): Promise<Uint8Array> {
   const res = await fetch(path)
@@ -79,6 +89,7 @@ function fileBase(minute: ExportMinute) {
 function p(text: string, opts?: { bold?: boolean; center?: boolean; size?: number }) {
   return new Paragraph({
     alignment: opts?.center ? AlignmentType.CENTER : AlignmentType.LEFT,
+    spacing: { after: 0 },
     children: [
       new TextRun({
         text: text || ' ',
@@ -90,193 +101,158 @@ function p(text: string, opts?: { bold?: boolean; center?: boolean; size?: numbe
   })
 }
 
-function headerCell(text: string, span = 2) {
+function cell(
+  text: string,
+  width: number,
+  span: number,
+  opts?: {
+    bold?: boolean
+    center?: boolean
+    fill?: string
+  },
+) {
   return new TableCell({
-    columnSpan: span,
     borders: BORDER,
-    shading: { type: ShadingType.CLEAR, fill: HEADER_BLUE },
+    width: { size: width, type: WidthType.DXA },
+    columnSpan: span,
+    shading: opts?.fill
+      ? { type: ShadingType.CLEAR, fill: opts.fill }
+      : undefined,
     verticalAlign: VerticalAlign.CENTER,
-    children: [p(text, { bold: true, center: true })],
+    children: [p(text, { bold: opts?.bold, center: opts?.center })],
+  })
+}
+
+function sectionHeaderRow(text: string) {
+  return new TableRow({
+    height: { value: ROW_H, rule: HeightRule.ATLEAST },
+    children: [
+      cell(text, TABLE_W, 5, {
+        bold: true,
+        center: true,
+        fill: HEADER_BLUE,
+      }),
+    ],
   })
 }
 
 function labelValueRow(label: string, value: string) {
   return new TableRow({
+    height: { value: ROW_H, rule: HeightRule.ATLEAST },
     children: [
-      new TableCell({
-        borders: BORDER,
-        width: { size: 30, type: WidthType.PERCENTAGE },
-        children: [p(label, { bold: true })],
-      }),
-      new TableCell({
-        borders: BORDER,
-        width: { size: 70, type: WidthType.PERCENTAGE },
-        children: [p(value || ' ')],
-      }),
+      cell(label, W_LABEL, 2, { bold: true }),
+      cell(value || ' ', W_VALUE, 3),
     ],
   })
 }
 
-function fullWidthRow(text: string, opts?: { header?: boolean; minLines?: number }) {
-  const lines = Math.max(opts?.minLines ?? 1, 1)
-  const children = [p(text, { bold: opts?.header, center: !!opts?.header })]
-  for (let i = 1; i < lines; i++) children.push(p(' '))
-  return new TableRow({
-    children: [
-      new TableCell({
-        columnSpan: 2,
-        borders: BORDER,
-        shading: opts?.header
-          ? { type: ShadingType.CLEAR, fill: HEADER_BLUE }
-          : undefined,
-        children,
-      }),
-    ],
-  })
-}
-
-function buildTableRows(minute: ExportMinute): TableRow[] {
+function buildMomTable(minute: ExportMinute) {
   const attendees =
     minute.attendees?.length > 0
       ? minute.attendees
       : [{ name: '', designation: '' }]
   const decisions =
-    minute.decisions?.length > 0 ? minute.decisions : [{ text: '' }]
+    minute.decisions?.length > 0
+      ? minute.decisions
+      : [{ text: '' }, { text: '' }]
 
-  return [
-    new TableRow({ children: [headerCell('Meeting')] }),
+  const rows: TableRow[] = [
+    sectionHeaderRow('Meeting'),
     labelValueRow('Meeting Title', minute.title),
     labelValueRow('Meeting Location', minute.location),
     labelValueRow('Meeting Date', minute.date),
-    new TableRow({ children: [headerCell('Attendance')] }),
+    sectionHeaderRow('Attendance'),
     new TableRow({
+      height: { value: ROW_H, rule: HeightRule.ATLEAST },
       children: [
-        new TableCell({
-          borders: BORDER,
-          width: { size: 50, type: WidthType.PERCENTAGE },
-          children: [p('Name', { bold: true, center: true })],
-        }),
-        new TableCell({
-          borders: BORDER,
-          width: { size: 50, type: WidthType.PERCENTAGE },
-          children: [p('Designation', { bold: true, center: true })],
-        }),
+        cell('Name', W_NAME, 4, { bold: true, center: true }),
+        cell('Designation', W_DESIG, 1, { bold: true, center: true }),
       ],
     }),
     ...attendees.map(
       (a) =>
         new TableRow({
+          height: { value: ROW_H, rule: HeightRule.ATLEAST },
           children: [
-            new TableCell({
-              borders: BORDER,
-              width: { size: 50, type: WidthType.PERCENTAGE },
-              children: [p(a.name || ' ')],
-            }),
-            new TableCell({
-              borders: BORDER,
-              width: { size: 50, type: WidthType.PERCENTAGE },
-              children: [p(a.designation || ' ')],
-            }),
+            cell(a.name || ' ', W_NAME, 4),
+            cell(a.designation || ' ', W_DESIG, 1),
           ],
         }),
     ),
-    fullWidthRow('Discussion and Summary', { header: true }),
-    fullWidthRow(minute.discussion || ' ', { minLines: 4 }),
-    fullWidthRow('Recommendations and Decisions', { header: true }),
+    sectionHeaderRow('Discussion and Summary'),
+    new TableRow({
+      height: { value: DISCUSSION_H, rule: HeightRule.ATLEAST },
+      children: [
+        new TableCell({
+          borders: BORDER,
+          width: { size: TABLE_W, type: WidthType.DXA },
+          columnSpan: 5,
+          children: [p(minute.discussion || ' '), p(' '), p(' '), p(' ')],
+        }),
+      ],
+    }),
+    sectionHeaderRow('Recommendations and Decisions'),
     ...decisions.map(
       (d, i) =>
         new TableRow({
+          height: { value: ROW_H, rule: HeightRule.ATLEAST },
           children: [
-            new TableCell({
-              borders: BORDER,
-              width: { size: 10, type: WidthType.PERCENTAGE },
-              verticalAlign: VerticalAlign.CENTER,
-              children: [p(String(i + 1), { bold: true, center: true })],
-            }),
-            new TableCell({
-              borders: BORDER,
-              width: { size: 90, type: WidthType.PERCENTAGE },
-              children: [p(d.text || ' ')],
-            }),
+            cell(String(i + 1), W_NUM, 1, { bold: true, center: true }),
+            cell(d.text || ' ', W_DECISION, 4),
           ],
         }),
     ),
-    labelValueRow('Prepared by', minute.preparedBy),
   ]
-}
-
-/** Centered: Tahawul | vertical line | MOH (close together) */
-function topBrandTable(mohBytes: Uint8Array, tahawulBytes: Uint8Array) {
-  const lineBorders = {
-    top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-    bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-    left: { style: BorderStyle.SINGLE, size: 12, color: '000000' },
-    right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
-  }
 
   return new Table({
+    width: { size: TABLE_W, type: WidthType.DXA },
+    columnWidths: [...COLS],
+    layout: TableLayoutType.FIXED,
+    rows,
+  })
+}
+
+/** Centered header matching PDF: Tahawul | line | MOH (transparent PNGs) */
+function topBrandHeader(
+  mohBytes: Uint8Array,
+  tahawulBytes: Uint8Array,
+  dividerBytes: Uint8Array,
+) {
+  return new Paragraph({
     alignment: AlignmentType.CENTER,
-    width: { size: 4200, type: WidthType.DXA },
-    columnWidths: [1700, 200, 2300],
-    rows: [
-      new TableRow({
-        children: [
-          new TableCell({
-            borders: NO_BORDER,
-            width: { size: 1700, type: WidthType.DXA },
-            verticalAlign: VerticalAlign.CENTER,
-            children: [
-              new Paragraph({
-                alignment: AlignmentType.RIGHT,
-                children: [
-                  new ImageRun({
-                    type: 'png',
-                    data: tahawulBytes,
-                    transformation: { width: 100, height: 44 },
-                    altText: {
-                      title: 'Tahawul',
-                      description: 'Tahawul logo',
-                      name: 'tahawul',
-                    },
-                  }),
-                ],
-              }),
-            ],
-          }),
-          new TableCell({
-            borders: lineBorders,
-            width: { size: 200, type: WidthType.DXA },
-            verticalAlign: VerticalAlign.CENTER,
-            children: [
-              new Paragraph({
-                alignment: AlignmentType.CENTER,
-                children: [new TextRun({ text: ' ', size: 40 })],
-              }),
-            ],
-          }),
-          new TableCell({
-            borders: NO_BORDER,
-            width: { size: 2300, type: WidthType.DXA },
-            verticalAlign: VerticalAlign.CENTER,
-            children: [
-              new Paragraph({
-                alignment: AlignmentType.LEFT,
-                children: [
-                  new ImageRun({
-                    type: 'png',
-                    data: mohBytes,
-                    transformation: { width: 140, height: 54 },
-                    altText: {
-                      title: 'Ministry of Health',
-                      description: 'MOH logo',
-                      name: 'moh-logo',
-                    },
-                  }),
-                ],
-              }),
-            ],
-          }),
-        ],
+    spacing: { after: 200 },
+    children: [
+      new ImageRun({
+        type: 'png',
+        data: tahawulBytes,
+        transformation: { width: 120, height: 62 },
+        altText: {
+          title: 'Tahawul',
+          description: 'Tahawul logo',
+          name: 'tahawul',
+        },
+      }),
+      new TextRun({ text: '  ', size: 16 }),
+      new ImageRun({
+        type: 'png',
+        data: dividerBytes,
+        transformation: { width: 3, height: 68 },
+        altText: {
+          title: 'Divider',
+          description: 'Vertical divider line',
+          name: 'divider',
+        },
+      }),
+      new TextRun({ text: '  ', size: 16 }),
+      new ImageRun({
+        type: 'png',
+        data: mohBytes,
+        transformation: { width: 170, height: 66 },
+        altText: {
+          title: 'Ministry of Health',
+          description: 'MOH logo',
+          name: 'moh-logo',
+        },
       }),
     ],
   })
@@ -302,19 +278,39 @@ function sloganParagraph(
   })
 }
 
+function preparedByParagraph(name: string) {
+  return new Paragraph({
+    spacing: { before: 200, after: 120 },
+    children: [
+      new TextRun({
+        text: 'Prepared by: ',
+        bold: true,
+        font: 'Times New Roman',
+        size: 22,
+      }),
+      new TextRun({
+        text: name || ' ',
+        font: 'Times New Roman',
+        size: 22,
+      }),
+    ],
+  })
+}
+
 function belowTableSlogans() {
   return [
-    sloganParagraph(ARABIC_TRANSFORM, { arabic: true, before: 280 }),
-    sloganParagraph(ARABIC_SLOGAN, { arabic: true }),
+    sloganParagraph(ARABIC_SLOGAN, { arabic: true, before: 200 }),
     sloganParagraph(ENGLISH_SLOGAN),
+    sloganParagraph(ARABIC_TRANSFORM, { arabic: true }),
     sloganParagraph(ENGLISH_TRANSFORM),
   ]
 }
 
 export async function downloadWord(minute: ExportMinute) {
-  const [mohBytes, tahawulBytes] = await Promise.all([
+  const [mohBytes, tahawulBytes, dividerBytes] = await Promise.all([
     loadBrandBytes('/brand/moh-logo.png'),
     loadBrandBytes('/brand/tahawul.png'),
+    loadBrandBytes('/brand/divider.png'),
   ])
 
   const doc = new Document({
@@ -326,12 +322,9 @@ export async function downloadWord(minute: ExportMinute) {
           },
         },
         children: [
-          topBrandTable(mohBytes, tahawulBytes),
-          new Paragraph({ spacing: { after: 200 }, children: [] }),
-          new Table({
-            width: { size: 100, type: WidthType.PERCENTAGE },
-            rows: buildTableRows(minute),
-          }),
+          topBrandHeader(mohBytes, tahawulBytes, dividerBytes),
+          buildMomTable(minute),
+          preparedByParagraph(minute.preparedBy),
           ...belowTableSlogans(),
         ],
       },
@@ -359,8 +352,13 @@ export async function downloadPdf(minute: ExportMinute) {
   const pageH = doc.internal.pageSize.getHeight()
   const margin = 14
   const tableW = pageW - margin * 2
-  const leftW = tableW * 0.3
-  const rightW = tableW * 0.7
+  // Match template ratios from Minutes of Meeting.docx
+  const leftW = tableW * (2389 / 9882)
+  const rightW = tableW - leftW
+  const nameW = tableW * (4642 / 9882)
+  const desigW = tableW - nameW
+  const numW = tableW * (522 / 9882)
+  const decisionW = tableW - numW
   let y = 10
 
   const ensureSpace = (h: number) => {
@@ -378,6 +376,8 @@ export async function downloadPdf(minute: ExportMinute) {
     text: string,
     opts?: { fill?: string; bold?: boolean; center?: boolean },
   ) => {
+    doc.setDrawColor(0, 0, 0)
+    doc.setLineWidth(0.2)
     if (opts?.fill) {
       const [r, g, b] = [
         parseInt(opts.fill.slice(0, 2), 16),
@@ -407,24 +407,26 @@ export async function downloadPdf(minute: ExportMinute) {
     return Math.max(minH, lines.length * 5 + 4)
   }
 
-  // Centered header: Tahawul | line | MOH (close together)
-  const tahW = 32
-  const tahH = 14
-  const mohW = 42
-  const mohH = 16
-  const gap = 4
-  const lineGap = 5
+  // Centered header: Tahawul | line | MOH (touching the line)
+  const tahW = 42
+  const tahH = 22
+  const mohW = 58
+  const mohH = 23
+  const gap = 2
+  const lineGap = 2
   const groupW = tahW + gap + lineGap + mohW
   const groupX = (pageW - groupW) / 2
   const logoY = y
+  const lineH = Math.max(tahH, mohH)
 
-  doc.addImage(tahawulUrl, 'PNG', groupX, logoY + 1, tahW, tahH)
+  doc.addImage(tahawulUrl, 'PNG', groupX, logoY + (lineH - tahH) / 2, tahW, tahH)
   const lineX = groupX + tahW + gap
   doc.setDrawColor(0, 0, 0)
-  doc.setLineWidth(0.5)
-  doc.line(lineX, logoY, lineX, logoY + Math.max(tahH, mohH))
-  doc.addImage(mohUrl, 'PNG', lineX + lineGap, logoY, mohW, mohH)
-  y += Math.max(mohH, tahH) + 8
+  doc.setLineWidth(0.35)
+  // Draw logos first, then the divider on top so the line stays visible
+  doc.addImage(mohUrl, 'PNG', lineX + lineGap, logoY + (lineH - mohH) / 2, mohW, mohH)
+  doc.line(lineX, logoY, lineX, logoY + lineH)
+  y += lineH + 8
 
   const headerRow = (title: string) => {
     const h = 10
@@ -458,11 +460,8 @@ export async function downloadPdf(minute: ExportMinute) {
   {
     const h = 10
     ensureSpace(h)
-    drawCell(margin, y, tableW / 2, h, 'Name', {
-      bold: true,
-      center: true,
-    })
-    drawCell(margin + tableW / 2, y, tableW / 2, h, 'Designation', {
+    drawCell(margin, y, nameW, h, 'Name', { bold: true, center: true })
+    drawCell(margin + nameW, y, desigW, h, 'Designation', {
       bold: true,
       center: true,
     })
@@ -474,20 +473,16 @@ export async function downloadPdf(minute: ExportMinute) {
       ? minute.attendees
       : [{ name: '', designation: '' }]
   attendees.forEach((a) => {
-    const h = Math.max(
-      rowHeight(a.name, tableW / 2),
-      rowHeight(a.designation, tableW / 2),
-      10,
-    )
+    const h = Math.max(rowHeight(a.name, nameW), rowHeight(a.designation, desigW), 10)
     ensureSpace(h)
-    drawCell(margin, y, tableW / 2, h, a.name)
-    drawCell(margin + tableW / 2, y, tableW / 2, h, a.designation)
+    drawCell(margin, y, nameW, h, a.name)
+    drawCell(margin + nameW, y, desigW, h, a.designation)
     y += h
   })
 
   headerRow('Discussion and Summary')
   {
-    const h = Math.max(rowHeight(minute.discussion, tableW, 28), 28)
+    const h = Math.max(rowHeight(minute.discussion, tableW, 40), 40)
     ensureSpace(h)
     drawCell(margin, y, tableW, h, minute.discussion)
     y += h
@@ -495,39 +490,45 @@ export async function downloadPdf(minute: ExportMinute) {
 
   headerRow('Recommendations and Decisions')
   const decisions =
-    minute.decisions?.length > 0 ? minute.decisions : [{ text: '' }]
+    minute.decisions?.length > 0
+      ? minute.decisions
+      : [{ text: '' }, { text: '' }]
   decisions.forEach((d, i) => {
-    const numW = tableW * 0.1
-    const textW = tableW * 0.9
-    const h = Math.max(rowHeight(d.text, textW), 10)
+    const h = Math.max(rowHeight(d.text, decisionW), 10)
     ensureSpace(h)
     drawCell(margin, y, numW, h, String(i + 1), {
       bold: true,
       center: true,
     })
-    drawCell(margin + numW, y, textW, h, d.text)
+    drawCell(margin + numW, y, decisionW, h, d.text)
     y += h
   })
 
-  labelValue('Prepared by', minute.preparedBy)
-
-  // Real text slogans (not images)
-  ensureSpace(36)
+  // Outside table, like the official template
+  ensureSpace(40)
   y += 8
+  doc.setFont('times', 'bold')
+  doc.setFontSize(11)
+  doc.setTextColor(0, 0, 0)
+  doc.text(`Prepared by: ${minute.preparedBy || ''}`, margin, y)
+  y += 8
+
   const [sr, sg, sb] = [46, 116, 181]
   doc.setTextColor(sr, sg, sb)
-
   doc.setFont('NotoNaskhArabic', 'normal')
   doc.setFontSize(11)
-  doc.text(ARABIC_TRANSFORM, pageW / 2, y, { align: 'center' })
-  y += 6
   doc.text(ARABIC_SLOGAN, pageW / 2, y, { align: 'center' })
   y += 6
-
   doc.setFont('times', 'normal')
   doc.setFontSize(10)
   doc.text(ENGLISH_SLOGAN, pageW / 2, y, { align: 'center' })
   y += 5
+  doc.setFont('NotoNaskhArabic', 'normal')
+  doc.setFontSize(11)
+  doc.text(ARABIC_TRANSFORM, pageW / 2, y, { align: 'center' })
+  y += 6
+  doc.setFont('times', 'normal')
+  doc.setFontSize(10)
   doc.text(ENGLISH_TRANSFORM, pageW / 2, y, { align: 'center' })
 
   doc.save(`${fileBase(minute)}.pdf`)

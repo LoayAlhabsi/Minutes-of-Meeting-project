@@ -1,4 +1,4 @@
-package om.gov.moh.minutes.service.impl;
+package om.gov.moh.minutes.service.implementation;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -18,34 +18,56 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
-public class MinuteServiceImpl implements MinuteService {
+public class MinuteServiceImplementation implements MinuteService {
 
   @Autowired
   private MinuteRepository minuteRepository;
 
   @Override
-  public List<MinuteDto> findAll() throws ExecutionException, InterruptedException {
-    return minuteRepository.findAll().stream().map(this::toDto).collect(Collectors.toList());
+  public List<MinuteDto> findAll() {
+    try {
+      return minuteRepository.findAll().stream().map(this::toDto).collect(Collectors.toList());
+    } catch (ExecutionException | InterruptedException e) {
+      throw wrap(e);
+    }
   }
 
   @Override
-  public MinuteDto save(MinuteDto dto) throws ExecutionException, InterruptedException {
-    validateMeetingDate(dto.getDate(), true);
-    Minute saved = minuteRepository.save(toEntity(dto));
-    return toDto(saved);
+  public MinuteDto save(MinuteDto dto) {
+    try {
+      validateMeetingDate(dto.getDate(), true);
+      Minute saved = minuteRepository.save(toEntity(dto));
+      return toDto(saved);
+    } catch (ExecutionException | InterruptedException e) {
+      throw wrap(e);
+    }
   }
 
   @Override
-  public MinuteDto update(String id, MinuteDto dto)
-      throws ExecutionException, InterruptedException {
-    validateMeetingDate(dto.getDate(), false);
-    Minute updated = minuteRepository.update(id, toEntity(dto));
-    return toDto(updated);
+  public MinuteDto update(String id, MinuteDto dto) {
+    try {
+      validateMeetingDate(dto.getDate(), false);
+      Minute updated = minuteRepository.update(id, toEntity(dto));
+      return toDto(updated);
+    } catch (ExecutionException | InterruptedException e) {
+      throw wrap(e);
+    }
   }
 
   @Override
-  public void delete(String id) throws ExecutionException, InterruptedException {
-    minuteRepository.deleteById(id);
+  public void delete(String id) {
+    try {
+      minuteRepository.deleteById(id);
+    } catch (ExecutionException | InterruptedException e) {
+      throw wrap(e);
+    }
+  }
+
+  private RuntimeException wrap(Exception e) {
+    if (e instanceof InterruptedException) {
+      Thread.currentThread().interrupt();
+    }
+    return new RuntimeException(e);
   }
 
   private void validateMeetingDate(String date, boolean create) {
