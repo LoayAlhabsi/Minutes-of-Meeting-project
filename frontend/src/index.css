@@ -1,0 +1,30 @@
+:root {
+  font-family: 'Sora', 'IBM Plex Sans Arabic', system-ui, sans-serif;
+  line-height: 1.5;
+  color: #122833;
+  background: #fff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #fff;
+}
+
+#root {
+  min-height: 100svh;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
