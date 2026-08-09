@@ -23,18 +23,18 @@ public class MinuteController {
   private MinuteService minuteService;
 
   @GetMapping
-  public List<MinuteDto> getAll() {
+  public List<MinuteDto> get() {
     return minuteService.findAll();
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public MinuteDto create(@RequestBody MinuteDto minuteDto) {
+  public MinuteDto post(@RequestBody MinuteDto minuteDto) {
     return minuteService.save(minuteDto);
   }
 
   @PutMapping("/{id}")
-  public MinuteDto update(@PathVariable String id, @RequestBody MinuteDto minuteDto) {
+  public MinuteDto put(@PathVariable String id, @RequestBody MinuteDto minuteDto) {
     return minuteService.update(id, minuteDto);
   }
 

@@ -1,0 +1,13 @@
+C:\Users\jyrcf\OneDrive\Desktop\trainee project\backend\src\main\java\om\gov\moh\minutes\config\FirebaseConfig.java
+C:\Users\jyrcf\OneDrive\Desktop\trainee project\backend\src\main\java\om\gov\moh\minutes\controller\MinuteController.java
+C:\Users\jyrcf\OneDrive\Desktop\trainee project\backend\src\main\java\om\gov\moh\minutes\dto\AttendeeDto.java
+C:\Users\jyrcf\OneDrive\Desktop\trainee project\backend\src\main\java\om\gov\moh\minutes\dto\DecisionDto.java
+C:\Users\jyrcf\OneDrive\Desktop\trainee project\backend\src\main\java\om\gov\moh\minutes\dto\MinuteDto.java
+C:\Users\jyrcf\OneDrive\Desktop\trainee project\backend\src\main\java\om\gov\moh\minutes\entity\Attendee.java
+C:\Users\jyrcf\OneDrive\Desktop\trainee project\backend\src\main\java\om\gov\moh\minutes\entity\Decision.java
+C:\Users\jyrcf\OneDrive\Desktop\trainee project\backend\src\main\java\om\gov\moh\minutes\entity\Minute.java
+C:\Users\jyrcf\OneDrive\Desktop\trainee project\backend\src\main\java\om\gov\moh\minutes\exception\GlobalExceptionHandler.java
+C:\Users\jyrcf\OneDrive\Desktop\trainee project\backend\src\main\java\om\gov\moh\minutes\MinutesApiApplication.java
+C:\Users\jyrcf\OneDrive\Desktop\trainee project\backend\src\main\java\om\gov\moh\minutes\repository\MinuteRepository.java
+C:\Users\jyrcf\OneDrive\Desktop\trainee project\backend\src\main\java\om\gov\moh\minutes\service\implementation\MinuteServiceImplementation.java
+C:\Users\jyrcf\OneDrive\Desktop\trainee project\backend\src\main\java\om\gov\moh\minutes\service\MinuteService.java

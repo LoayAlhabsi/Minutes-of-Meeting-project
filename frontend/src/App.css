@@ -8,12 +8,20 @@
 .topbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 1.25rem;
   padding: 0.85rem 1.5rem;
   background: #0b5ea8;
   position: sticky;
   top: 0;
   z-index: 10;
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  min-width: 0;
 }
 
 .logo {
@@ -28,8 +36,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
-  padding-left: 1.15rem;
-  border-left: 1px solid rgba(255, 255, 255, 0.35);
+  padding-inline-start: 1.15rem;
+  border-inline-start: 1px solid rgba(255, 255, 255, 0.35);
   color: #fff;
 }
 
@@ -38,10 +46,47 @@
   font-weight: 600;
 }
 
-.topbar-title .ar {
-  font-family: 'IBM Plex Sans Arabic', 'Sora', sans-serif;
+.topbar-title .sub {
   font-size: 0.85rem;
   opacity: 0.9;
+}
+
+html[lang='ar'] .topbar-title,
+html[lang='ar'] .app {
+  font-family: 'IBM Plex Sans Arabic', 'Sora', sans-serif;
+}
+
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.2rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  flex-shrink: 0;
+}
+
+.lang-btn {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.85);
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  min-width: 2.5rem;
+}
+
+.lang-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.lang-btn.active {
+  background: #fff;
+  color: #0b5ea8;
 }
 
 .content {
@@ -137,8 +182,13 @@ th {
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  text-align: left;
+  text-align: start;
   padding: 0.65rem 0.75rem;
+}
+
+html[lang='ar'] th {
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 td input {

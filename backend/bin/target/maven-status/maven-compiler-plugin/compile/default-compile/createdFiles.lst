@@ -1,0 +1,14 @@
+om\gov\moh\minutes\config\FirebaseConfig$1.class
+om\gov\moh\minutes\controller\MinuteController.class
+om\gov\moh\minutes\MinutesApiApplication.class
+om\gov\moh\minutes\repository\MinuteRepository.class
+om\gov\moh\minutes\dto\AttendeeDto.class
+om\gov\moh\minutes\dto\DecisionDto.class
+om\gov\moh\minutes\entity\Decision.class
+om\gov\moh\minutes\entity\Attendee.class
+om\gov\moh\minutes\entity\Minute.class
+om\gov\moh\minutes\exception\GlobalExceptionHandler.class
+om\gov\moh\minutes\config\FirebaseConfig.class
+om\gov\moh\minutes\dto\MinuteDto.class
+om\gov\moh\minutes\service\implementation\MinuteServiceImplementation.class
+om\gov\moh\minutes\service\MinuteService.class

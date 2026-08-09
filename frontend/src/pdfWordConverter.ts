@@ -17,6 +17,12 @@ import {
   VerticalAlign,
 } from 'docx'
 import { saveAs } from 'file-saver'
+import {
+  documentSlogans,
+  exportLabels,
+  type ExportLabels,
+  type Locale,
+} from './localization'
 
 export type ExportAttendee = { name: string; designation: string }
 export type ExportDecision = { text: string }
@@ -33,12 +39,6 @@ export type ExportMinute = {
 
 const HEADER_BLUE = 'BDD6EE'
 const SLOGAN_BLUE = '2E74B5'
-const ARABIC_TRANSFORM = 'التحول الرقمي الصحي من أجل خدمات ذكية متكاملة'
-const ARABIC_SLOGAN = 'رقمنة الصحة والإبتكار لعناية راقية وصحة مستدامة'
-const ENGLISH_SLOGAN =
-  'Digitalized Health and Innovation Quality Care and sustainable'
-const ENGLISH_TRANSFORM =
-  'Digital Health Transformation for Integrated Smart Services'
 
 const BORDER = {
   top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
@@ -81,21 +81,41 @@ function bytesToDataUrl(bytes: Uint8Array, mime = 'image/png') {
   return `data:${mime};base64,${bytesToBase64(bytes)}`
 }
 
-function fileBase(minute: ExportMinute) {
-  const safe = (minute.title || 'minutes').replace(/[\\/:*?"<>|]+/g, '-').trim()
-  return `${safe || 'minutes'}-${minute.date || 'meeting'}`
+function hasArabic(text: string) {
+  return /[\u0600-\u06FF]/.test(text)
 }
 
-function p(text: string, opts?: { bold?: boolean; center?: boolean; size?: number }) {
+function fileBase(minute: ExportMinute, labels: ExportLabels) {
+  const raw = (minute.title || labels.fileFallback).trim()
+  const safe = raw
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+  const datePart = minute.date || labels.fileDateFallback
+  return `${safe || labels.fileFallback}-${datePart}`
+}
+
+function p(
+  text: string,
+  opts?: { bold?: boolean; center?: boolean; size?: number; arabic?: boolean },
+) {
+  const arabic = opts?.arabic || hasArabic(text)
   return new Paragraph({
-    alignment: opts?.center ? AlignmentType.CENTER : AlignmentType.LEFT,
+    alignment: opts?.center
+      ? AlignmentType.CENTER
+      : arabic
+        ? AlignmentType.RIGHT
+        : AlignmentType.LEFT,
+    bidirectional: arabic,
     spacing: { after: 0 },
     children: [
       new TextRun({
         text: text || ' ',
         bold: opts?.bold,
         size: opts?.size ?? 22,
-        font: 'Times New Roman',
+        font: arabic ? 'Segoe UI' : 'Times New Roman',
+        rightToLeft: arabic,
       }),
     ],
   })
@@ -109,6 +129,7 @@ function cell(
     bold?: boolean
     center?: boolean
     fill?: string
+    arabic?: boolean
   },
 ) {
   return new TableCell({
@@ -119,11 +140,17 @@ function cell(
       ? { type: ShadingType.CLEAR, fill: opts.fill }
       : undefined,
     verticalAlign: VerticalAlign.CENTER,
-    children: [p(text, { bold: opts?.bold, center: opts?.center })],
+    children: [
+      p(text, {
+        bold: opts?.bold,
+        center: opts?.center,
+        arabic: opts?.arabic,
+      }),
+    ],
   })
 }
 
-function sectionHeaderRow(text: string) {
+function sectionHeaderRow(text: string, arabic: boolean) {
   return new TableRow({
     height: { value: ROW_H, rule: HeightRule.ATLEAST },
     children: [
@@ -131,22 +158,23 @@ function sectionHeaderRow(text: string) {
         bold: true,
         center: true,
         fill: HEADER_BLUE,
+        arabic,
       }),
     ],
   })
 }
 
-function labelValueRow(label: string, value: string) {
+function labelValueRow(label: string, value: string, arabic: boolean) {
   return new TableRow({
     height: { value: ROW_H, rule: HeightRule.ATLEAST },
     children: [
-      cell(label, W_LABEL, 2, { bold: true }),
-      cell(value || ' ', W_VALUE, 3),
+      cell(label, W_LABEL, 2, { bold: true, arabic }),
+      cell(value || ' ', W_VALUE, 3, { arabic: arabic || hasArabic(value) }),
     ],
   })
 }
 
-function buildMomTable(minute: ExportMinute) {
+function buildMomTable(minute: ExportMinute, labels: ExportLabels, arabic: boolean) {
   const attendees =
     minute.attendees?.length > 0
       ? minute.attendees
@@ -157,16 +185,20 @@ function buildMomTable(minute: ExportMinute) {
       : [{ text: '' }, { text: '' }]
 
   const rows: TableRow[] = [
-    sectionHeaderRow('Meeting'),
-    labelValueRow('Meeting Title', minute.title),
-    labelValueRow('Meeting Location', minute.location),
-    labelValueRow('Meeting Date', minute.date),
-    sectionHeaderRow('Attendance'),
+    sectionHeaderRow(labels.meeting, arabic),
+    labelValueRow(labels.meetingTitle, minute.title, arabic),
+    labelValueRow(labels.meetingLocation, minute.location, arabic),
+    labelValueRow(labels.meetingDate, minute.date, arabic),
+    sectionHeaderRow(labels.attendance, arabic),
     new TableRow({
       height: { value: ROW_H, rule: HeightRule.ATLEAST },
       children: [
-        cell('Name', W_NAME, 4, { bold: true, center: true }),
-        cell('Designation', W_DESIG, 1, { bold: true, center: true }),
+        cell(labels.name, W_NAME, 4, { bold: true, center: true, arabic }),
+        cell(labels.designation, W_DESIG, 1, {
+          bold: true,
+          center: true,
+          arabic,
+        }),
       ],
     }),
     ...attendees.map(
@@ -174,12 +206,16 @@ function buildMomTable(minute: ExportMinute) {
         new TableRow({
           height: { value: ROW_H, rule: HeightRule.ATLEAST },
           children: [
-            cell(a.name || ' ', W_NAME, 4),
-            cell(a.designation || ' ', W_DESIG, 1),
+            cell(a.name || ' ', W_NAME, 4, {
+              arabic: arabic || hasArabic(a.name),
+            }),
+            cell(a.designation || ' ', W_DESIG, 1, {
+              arabic: arabic || hasArabic(a.designation),
+            }),
           ],
         }),
     ),
-    sectionHeaderRow('Discussion and Summary'),
+    sectionHeaderRow(labels.discussion, arabic),
     new TableRow({
       height: { value: DISCUSSION_H, rule: HeightRule.ATLEAST },
       children: [
@@ -187,18 +223,27 @@ function buildMomTable(minute: ExportMinute) {
           borders: BORDER,
           width: { size: TABLE_W, type: WidthType.DXA },
           columnSpan: 5,
-          children: [p(minute.discussion || ' '), p(' '), p(' '), p(' ')],
+          children: [
+            p(minute.discussion || ' ', {
+              arabic: arabic || hasArabic(minute.discussion),
+            }),
+            p(' '),
+            p(' '),
+            p(' '),
+          ],
         }),
       ],
     }),
-    sectionHeaderRow('Recommendations and Decisions'),
+    sectionHeaderRow(labels.decisions, arabic),
     ...decisions.map(
       (d, i) =>
         new TableRow({
           height: { value: ROW_H, rule: HeightRule.ATLEAST },
           children: [
             cell(String(i + 1), W_NUM, 1, { bold: true, center: true }),
-            cell(d.text || ' ', W_DECISION, 4),
+            cell(d.text || ' ', W_DECISION, 4, {
+              arabic: arabic || hasArabic(d.text),
+            }),
           ],
         }),
     ),
@@ -278,35 +323,41 @@ function sloganParagraph(
   })
 }
 
-function preparedByParagraph(name: string) {
+function preparedByParagraph(label: string, name: string, arabic: boolean) {
   return new Paragraph({
     spacing: { before: 200, after: 120 },
+    bidirectional: arabic,
+    alignment: arabic ? AlignmentType.RIGHT : AlignmentType.LEFT,
     children: [
       new TextRun({
-        text: 'Prepared by: ',
+        text: `${label}: `,
         bold: true,
-        font: 'Times New Roman',
+        font: arabic ? 'Segoe UI' : 'Times New Roman',
         size: 22,
+        rightToLeft: arabic,
       }),
       new TextRun({
         text: name || ' ',
-        font: 'Times New Roman',
+        font: arabic || hasArabic(name) ? 'Segoe UI' : 'Times New Roman',
         size: 22,
+        rightToLeft: arabic || hasArabic(name),
       }),
     ],
   })
 }
 
-function belowTableSlogans() {
-  return [
-    sloganParagraph(ARABIC_SLOGAN, { arabic: true, before: 200 }),
-    sloganParagraph(ENGLISH_SLOGAN),
-    sloganParagraph(ARABIC_TRANSFORM, { arabic: true }),
-    sloganParagraph(ENGLISH_TRANSFORM),
-  ]
+function belowTableSlogans(locale: Locale) {
+  return documentSlogans(locale).map((line, index) =>
+    sloganParagraph(line.text, {
+      arabic: line.arabic,
+      before: index === 0 ? 200 : undefined,
+    }),
+  )
 }
 
-export async function downloadWord(minute: ExportMinute) {
+export async function downloadWord(minute: ExportMinute, locale: Locale = 'en') {
+  const labels = exportLabels(locale)
+  const arabic = locale === 'ar'
   const [mohBytes, tahawulBytes, dividerBytes] = await Promise.all([
     loadBrandBytes('/brand/moh-logo.png'),
     loadBrandBytes('/brand/tahawul.png'),
@@ -323,19 +374,21 @@ export async function downloadWord(minute: ExportMinute) {
         },
         children: [
           topBrandHeader(mohBytes, tahawulBytes, dividerBytes),
-          buildMomTable(minute),
-          preparedByParagraph(minute.preparedBy),
-          ...belowTableSlogans(),
+          buildMomTable(minute, labels, arabic),
+          preparedByParagraph(labels.preparedBy, minute.preparedBy, arabic),
+          ...belowTableSlogans(locale),
         ],
       },
     ],
   })
 
   const blob = await Packer.toBlob(doc)
-  saveAs(blob, `${fileBase(minute)}.docx`)
+  saveAs(blob, `${fileBase(minute, labels)}.docx`)
 }
 
-export async function downloadPdf(minute: ExportMinute) {
+export async function downloadPdf(minute: ExportMinute, locale: Locale = 'en') {
+  const labels = exportLabels(locale)
+  const arabic = locale === 'ar'
   const [mohBytes, tahawulBytes, fontBytes] = await Promise.all([
     loadBrandBytes('/brand/moh-logo.png'),
     loadBrandBytes('/brand/tahawul.png'),
@@ -360,6 +413,8 @@ export async function downloadPdf(minute: ExportMinute) {
   const numW = tableW * (522 / 9882)
   const decisionW = tableW - numW
   let y = 10
+
+  const useArabicFont = (text: string) => arabic || hasArabic(text)
 
   const ensureSpace = (h: number) => {
     if (y + h > pageH - 16) {
@@ -389,13 +444,20 @@ export async function downloadPdf(minute: ExportMinute) {
     } else {
       doc.rect(x, yy, w, h)
     }
-    doc.setFont('times', opts?.bold ? 'bold' : 'normal')
+    const arabicText = useArabicFont(text)
+    if (arabicText) {
+      doc.setFont('NotoNaskhArabic', 'normal')
+    } else {
+      doc.setFont('times', opts?.bold ? 'bold' : 'normal')
+    }
     doc.setFontSize(10)
     doc.setTextColor(0, 0, 0)
     const lines = doc.splitTextToSize(text || ' ', w - 4)
     const textY = yy + 5
     if (opts?.center) {
       doc.text(lines, x + w / 2, textY, { align: 'center' })
+    } else if (arabicText) {
+      doc.text(lines, x + w - 2, textY, { align: 'right' })
     } else {
       doc.text(lines, x + 2, textY)
     }
@@ -403,6 +465,11 @@ export async function downloadPdf(minute: ExportMinute) {
 
   const rowHeight = (text: string, width: number, minH = 10) => {
     doc.setFontSize(10)
+    if (useArabicFont(text)) {
+      doc.setFont('NotoNaskhArabic', 'normal')
+    } else {
+      doc.setFont('times', 'normal')
+    }
     const lines = doc.splitTextToSize(text || ' ', width - 4)
     return Math.max(minH, lines.length * 5 + 4)
   }
@@ -451,17 +518,17 @@ export async function downloadPdf(minute: ExportMinute) {
     y += h
   }
 
-  headerRow('Meeting')
-  labelValue('Meeting Title', minute.title)
-  labelValue('Meeting Location', minute.location)
-  labelValue('Meeting Date', minute.date)
+  headerRow(labels.meeting)
+  labelValue(labels.meetingTitle, minute.title)
+  labelValue(labels.meetingLocation, minute.location)
+  labelValue(labels.meetingDate, minute.date)
 
-  headerRow('Attendance')
+  headerRow(labels.attendance)
   {
     const h = 10
     ensureSpace(h)
-    drawCell(margin, y, nameW, h, 'Name', { bold: true, center: true })
-    drawCell(margin + nameW, y, desigW, h, 'Designation', {
+    drawCell(margin, y, nameW, h, labels.name, { bold: true, center: true })
+    drawCell(margin + nameW, y, desigW, h, labels.designation, {
       bold: true,
       center: true,
     })
@@ -480,7 +547,7 @@ export async function downloadPdf(minute: ExportMinute) {
     y += h
   })
 
-  headerRow('Discussion and Summary')
+  headerRow(labels.discussion)
   {
     const h = Math.max(rowHeight(minute.discussion, tableW, 40), 40)
     ensureSpace(h)
@@ -488,7 +555,7 @@ export async function downloadPdf(minute: ExportMinute) {
     y += h
   }
 
-  headerRow('Recommendations and Decisions')
+  headerRow(labels.decisions)
   const decisions =
     minute.decisions?.length > 0
       ? minute.decisions
@@ -507,29 +574,35 @@ export async function downloadPdf(minute: ExportMinute) {
   // Outside table, like the official template
   ensureSpace(40)
   y += 8
-  doc.setFont('times', 'bold')
+  const preparedLine = `${labels.preparedBy}: ${minute.preparedBy || ''}`
+  if (useArabicFont(preparedLine)) {
+    doc.setFont('NotoNaskhArabic', 'normal')
+  } else {
+    doc.setFont('times', 'bold')
+  }
   doc.setFontSize(11)
   doc.setTextColor(0, 0, 0)
-  doc.text(`Prepared by: ${minute.preparedBy || ''}`, margin, y)
+  if (arabic) {
+    doc.text(preparedLine, pageW - margin, y, { align: 'right' })
+  } else {
+    doc.text(preparedLine, margin, y)
+  }
   y += 8
 
   const [sr, sg, sb] = [46, 116, 181]
   doc.setTextColor(sr, sg, sb)
-  doc.setFont('NotoNaskhArabic', 'normal')
-  doc.setFontSize(11)
-  doc.text(ARABIC_SLOGAN, pageW / 2, y, { align: 'center' })
-  y += 6
-  doc.setFont('times', 'normal')
-  doc.setFontSize(10)
-  doc.text(ENGLISH_SLOGAN, pageW / 2, y, { align: 'center' })
-  y += 5
-  doc.setFont('NotoNaskhArabic', 'normal')
-  doc.setFontSize(11)
-  doc.text(ARABIC_TRANSFORM, pageW / 2, y, { align: 'center' })
-  y += 6
-  doc.setFont('times', 'normal')
-  doc.setFontSize(10)
-  doc.text(ENGLISH_TRANSFORM, pageW / 2, y, { align: 'center' })
 
-  doc.save(`${fileBase(minute)}.pdf`)
+  documentSlogans(locale).forEach((line, index) => {
+    if (line.arabic) {
+      doc.setFont('NotoNaskhArabic', 'normal')
+      doc.setFontSize(11)
+    } else {
+      doc.setFont('times', 'normal')
+      doc.setFontSize(10)
+    }
+    doc.text(line.text, pageW / 2, y, { align: 'center' })
+    y += index === 0 ? 6 : 5
+  })
+
+  doc.save(`${fileBase(minute, labels)}.pdf`)
 }
