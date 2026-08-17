@@ -2,6 +2,8 @@ package om.gov.moh.minutes.controller;
 
 import java.util.List;
 import om.gov.moh.minutes.dto.MinuteDto;
+import om.gov.moh.minutes.dto.MinuteSearchRequest;
+import om.gov.moh.minutes.dto.PageResponse;
 import om.gov.moh.minutes.service.MinuteService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -25,6 +27,11 @@ public class MinuteController {
   @GetMapping
   public List<MinuteDto> get() {
     return minuteService.findAll();
+  }
+
+  @PostMapping("/search")
+  public PageResponse<MinuteDto> search(@RequestBody MinuteSearchRequest request) {
+    return minuteService.search(request);
   }
 
   @PostMapping

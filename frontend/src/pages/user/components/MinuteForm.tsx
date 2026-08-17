@@ -1,26 +1,30 @@
 import type { FormEvent } from 'react'
-import { t, type Locale } from '../localization'
-import type { Attendee, Decision } from '../types'
+import { t, type Locale } from '../../../localization'
+import type { Attendee, Decision, MinuteLanguage } from '../../../types'
 
 type Props = {
   locale: Locale
   isEditing: boolean
+  language: MinuteLanguage
   title: string
   location: string
   date: string
-  dateMin: string
+  dateMax: string
   discussion: string
   preparedBy: string
+  approvedBy: string
   attendees: Attendee[]
   decisions: Decision[]
   saving: boolean
   status: string
   error: string
+  onLanguageChange: (value: MinuteLanguage) => void
   onTitleChange: (value: string) => void
   onLocationChange: (value: string) => void
   onDateChange: (value: string) => void
   onDiscussionChange: (value: string) => void
   onPreparedByChange: (value: string) => void
+  onApprovedByChange: (value: string) => void
   onUpdateAttendee: (id: string, field: keyof Attendee, value: string) => void
   onAddAttendee: () => void
   onRemoveAttendee: (id: string) => void
@@ -36,22 +40,26 @@ type Props = {
 export function MinuteForm({
   locale,
   isEditing,
+  language,
   title,
   location,
   date,
-  dateMin,
+  dateMax,
   discussion,
   preparedBy,
+  approvedBy,
   attendees,
   decisions,
   saving,
   status,
   error,
+  onLanguageChange,
   onTitleChange,
   onLocationChange,
   onDateChange,
   onDiscussionChange,
   onPreparedByChange,
+  onApprovedByChange,
   onUpdateAttendee,
   onAddAttendee,
   onRemoveAttendee,
@@ -64,31 +72,57 @@ export function MinuteForm({
   onMarkDirty,
 }: Props) {
   return (
-    <form className="mom" onSubmit={onSubmit}>
+    <form
+      className="mom"
+      onSubmit={onSubmit}
+      dir={locale === 'ar' ? 'rtl' : 'ltr'}
+      lang={locale}
+    >
       <section className="block">
         <h2>{t(locale, 'meeting')}</h2>
-        <div className="grid-3">
-          <label>
-            {t(locale, 'meetingTitle')}
-            <input
-              value={title}
-              onChange={(e) => {
-                onTitleChange(e.target.value)
-                onMarkDirty()
-              }}
-              placeholder={t(locale, 'titlePlaceholder')}
-              required
-            />
-          </label>
+        <label>
+          {t(locale, 'docLanguage')}
+          <select
+            value={language}
+            onChange={(e) => {
+              onLanguageChange(e.target.value as MinuteLanguage)
+              onMarkDirty()
+            }}
+            disabled={isEditing}
+          >
+            <option value="en">{t(locale, 'langEnglish')}</option>
+            <option value="ar">{t(locale, 'langArabic')}</option>
+          </select>
+          {isEditing ? (
+            <span className="muted">{t(locale, 'docLanguageLocked')}</span>
+          ) : (
+            <span className="muted">{t(locale, 'docLanguageHint')}</span>
+          )}
+        </label>
+        <label className="meeting-title">
+          {t(locale, 'meetingTitle')}
+          <textarea
+            value={title}
+            onChange={(e) => {
+              onTitleChange(e.target.value)
+              onMarkDirty()
+            }}
+            placeholder={t(locale, 'titlePlaceholder')}
+            rows={2}
+            required
+          />
+        </label>
+        <div className="grid-2">
           <label>
             {t(locale, 'meetingLocation')}
-            <input
+            <textarea
               value={location}
               onChange={(e) => {
                 onLocationChange(e.target.value)
                 onMarkDirty()
               }}
               placeholder={t(locale, 'locationPlaceholder')}
+              rows={2}
               required
             />
           </label>
@@ -97,7 +131,7 @@ export function MinuteForm({
             <input
               type="date"
               value={date}
-              min={dateMin}
+              max={dateMax}
               onChange={(e) => {
                 onDateChange(e.target.value)
                 onMarkDirty()
@@ -110,12 +144,15 @@ export function MinuteForm({
 
       <section className="block">
         <div className="block-head">
-          <h2>{t(locale, 'attendance')}</h2>
+          <h2>
+            {t(locale, 'attendance')}
+            <span className="muted result-count"> ({attendees.length})</span>
+          </h2>
           <button type="button" className="btn-light" onClick={onAddAttendee}>
             {t(locale, 'addRow')}
           </button>
         </div>
-        <div className="table-wrap">
+        <div className="table-wrap table-wrap-scroll">
           <table>
             <thead>
               <tr>
@@ -169,12 +206,13 @@ export function MinuteForm({
       <section className="block">
         <h2>{t(locale, 'discussion')}</h2>
         <textarea
+          className="discussion-field"
           value={discussion}
           onChange={(e) => {
             onDiscussionChange(e.target.value)
             onMarkDirty()
           }}
-          rows={5}
+          rows={10}
           placeholder={t(locale, 'discussionPlaceholder')}
           required
         />
@@ -182,19 +220,23 @@ export function MinuteForm({
 
       <section className="block">
         <div className="block-head">
-          <h2>{t(locale, 'decisions')}</h2>
+          <h2>
+            {t(locale, 'decisions')}
+            <span className="muted result-count"> ({decisions.length})</span>
+          </h2>
           <button type="button" className="btn-light" onClick={onAddDecision}>
             {t(locale, 'addItem')}
           </button>
         </div>
-        <ol className="decisions">
+        <ol className="decisions decisions-scroll">
           {decisions.map((row, index) => (
             <li key={row.id}>
               <span className="decision-num">{index + 1}</span>
-              <input
+              <textarea
                 value={row.text}
                 onChange={(e) => onUpdateDecision(row.id, e.target.value)}
                 placeholder={t(locale, 'decisionPlaceholder')}
+                rows={2}
                 required
               />
               <button
@@ -215,13 +257,24 @@ export function MinuteForm({
           {t(locale, 'preparedBy')}
           <input
             value={preparedBy}
+            readOnly
+            aria-readonly="true"
+            className="readonly-field"
+          />
+          <span className="muted">{t(locale, 'preparedByAutoHint')}</span>
+        </label>
+        <label>
+          {t(locale, 'approvedBy')} *
+          <input
+            value={approvedBy}
             onChange={(e) => {
-              onPreparedByChange(e.target.value)
+              onApprovedByChange(e.target.value)
               onMarkDirty()
             }}
-            placeholder={t(locale, 'preparedByPlaceholder')}
+            placeholder={t(locale, 'approvedByPlaceholder')}
             required
           />
+          <span className="muted">{t(locale, 'approvedByHint')}</span>
         </label>
         <div className="save-area">
           {isEditing ? (

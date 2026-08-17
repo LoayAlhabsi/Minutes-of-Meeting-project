@@ -17,6 +17,12 @@ public class MinuteDto {
   private String date;
   private String discussion;
   private String preparedBy;
+  private String approvedBy;
+  private String createdByUserId;
+  private String createdByName;
+  private String createdByEmail;
+  /** en | ar */
+  private String language;
   private List<AttendeeDto> attendees = new ArrayList<>();
   private List<DecisionDto> decisions = new ArrayList<>();
 }

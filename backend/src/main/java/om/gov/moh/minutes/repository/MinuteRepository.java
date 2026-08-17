@@ -40,6 +40,31 @@ public class MinuteRepository {
     return result;
   }
 
+  public List<Minute> findByCreatedByUserId(String userId)
+      throws ExecutionException, InterruptedException {
+    ApiFuture<QuerySnapshot> future =
+        firestore.collection(COLLECTION).whereEqualTo("createdByUserId", userId).get();
+    List<Minute> result = new ArrayList<>();
+    for (QueryDocumentSnapshot doc : future.get().getDocuments()) {
+      result.add(fromDocument(doc));
+    }
+    result.sort(
+        (a, b) -> {
+          String da = a.getDate() == null ? "" : a.getDate();
+          String db = b.getDate() == null ? "" : b.getDate();
+          return db.compareTo(da);
+        });
+    return result;
+  }
+
+  public Minute findById(String id) throws ExecutionException, InterruptedException {
+    DocumentSnapshot doc = firestore.collection(COLLECTION).document(id).get().get();
+    if (!doc.exists()) {
+      throw new IllegalArgumentException("Meeting minutes not found");
+    }
+    return fromDocument(doc);
+  }
+
   public Minute save(Minute minute) throws ExecutionException, InterruptedException {
     Map<String, Object> data = toDataMap(minute);
     data.put("savedAt", com.google.cloud.Timestamp.now());
@@ -88,6 +113,11 @@ public class MinuteRepository {
     data.put("meetingDate", minute.getDate());
     data.put("discussionAndSummary", minute.getDiscussion());
     data.put("preparedByName", minute.getPreparedBy());
+    data.put("approvedByName", minute.getApprovedBy());
+    data.put("createdByUserId", minute.getCreatedByUserId());
+    data.put("createdByName", minute.getCreatedByName());
+    data.put("createdByEmail", minute.getCreatedByEmail());
+    data.put("language", normalizeLanguage(minute.getLanguage()));
     data.put("attendanceList", toAttendanceMaps(minute.getAttendees()));
     data.put("recommendationsAndDecisions", toDecisionMaps(minute.getDecisions()));
     return data;
@@ -101,9 +131,20 @@ public class MinuteRepository {
     minute.setDate(firstString(doc, "meetingDate", "date"));
     minute.setDiscussion(firstString(doc, "discussionAndSummary", "discussion"));
     minute.setPreparedBy(firstString(doc, "preparedByName", "preparedBy"));
+    minute.setApprovedBy(firstString(doc, "approvedByName", "approvedBy"));
+    minute.setCreatedByUserId(asString(doc.get("createdByUserId")));
+    minute.setCreatedByName(asString(doc.get("createdByName")));
+    minute.setCreatedByEmail(asString(doc.get("createdByEmail")));
+    minute.setLanguage(normalizeLanguage(asString(doc.get("language"))));
     minute.setAttendees(readAttendees(doc));
     minute.setDecisions(readDecisions(doc));
     return minute;
+  }
+
+  private String normalizeLanguage(String language) {
+    if (language == null) return "en";
+    String value = language.trim().toLowerCase();
+    return "ar".equals(value) ? "ar" : "en";
   }
 
   private String firstString(DocumentSnapshot doc, String primary, String fallback) {

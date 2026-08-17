@@ -17,6 +17,12 @@ public class Minute {
   private String date;
   private String discussion;
   private String preparedBy;
+  private String approvedBy;
+  private String createdByUserId;
+  private String createdByName;
+  private String createdByEmail;
+  /** en | ar — document language for form/export */
+  private String language;
   private List<Attendee> attendees = new ArrayList<>();
   private List<Decision> decisions = new ArrayList<>();
 }
